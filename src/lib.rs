@@ -1039,14 +1039,14 @@ pub fn operate_on_iso(iso_path: &Path, ops: &[IsoOp]) -> Result<(), OperateISOEr
         };
     }
     used.sort_unstable_by_key(|r| r.start);
-    let mut free_space = used.windows(2)
-        .filter_map(|r| {
-            let a = r[0].clone();
-            let b = r[1].clone();
-            let new_start = align(a.end, FILE_CONTENTS_ALIGNMENT);
-            if new_start >= b.start { None }
-            else { Some(new_start..b.start) }
-        }).collect::<Vec<_>>();
+    // a range can start inside or at the start of the previous one (empty files), so gaps follow the furthest end so far
+    let mut free_space = Vec::new();
+    let mut used_end = used.first().map_or(0, |r| r.end);
+    for r in used.iter().skip(1) {
+        let new_start = align(used_end, FILE_CONTENTS_ALIGNMENT);
+        if new_start < r.start { free_space.push(new_start..r.start) }
+        used_end = used_end.max(r.end);
+    }
 
     let data_end_start = align(data_end, FILE_CONTENTS_ALIGNMENT);
     if data_end_start < iso_size { free_space.push(data_end_start..iso_size) }
